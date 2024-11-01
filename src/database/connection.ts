@@ -9,7 +9,7 @@ try {
   sequelize
     .authenticate()
     .then(() => {
-      console.log("Database connection successfully!");
+      console.log("Connected");
     })
     .catch((error) => {
       console.error("Error:", error);
@@ -19,7 +19,7 @@ try {
 }
 
 sequelize.sync({ force: false }).then(() => {
-  console.log("Local changes injected to database successfully!");
+  console.log("Synced");
 });
 
 export default sequelize;
