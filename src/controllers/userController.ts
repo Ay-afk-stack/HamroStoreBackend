@@ -4,14 +4,15 @@ import bcrypt from "bcrypt";
 import generateToken from "../services/generateToken";
 import generateOTP from "../services/generateOTP";
 import sendMail from "../services/sendMail";
+import findData from "../services/findData";
+import sendResponse from "../services/sendResponse";
+import checkOTPExpiration from "../services/checkOTPExpiration";
 
 class UserController {
   static async register(req: Request, res: Response) {
     const { username, email, password } = req.body;
     if (!username || !email || !password) {
-      res
-        .status(400)
-        .json({ success: false, message: "Please fill all the details!" });
+      sendResponse(res, 400, false, "Please fill all thee details!");
       return;
     }
     try {
@@ -25,13 +26,9 @@ class UserController {
         subject: "Registration Succesful for Hamro store",
         text: "Account registered Successfully!",
       });
-      res.status(201).json({
-        success: true,
-        message: "User registered successfully!",
-      });
+      sendResponse(res, 201, true, "User registered successfully!");
     } catch (err) {
       console.error("Error:", err);
-      res.status(500).json({ success: false, message: "Server Error" });
     }
   }
 
@@ -39,10 +36,7 @@ class UserController {
     //Accept incoming data
     const { email, password } = req.body;
     if (!email || !password) {
-      res.status(400).json({
-        success: false,
-        message: "Please provide email and password!",
-      });
+      sendResponse(res, 400, false, "Please provide email and password");
       return;
     }
 
@@ -54,24 +48,17 @@ class UserController {
     });
 
     if (!user) {
-      res
-        .status(404)
-        .json({ success: false, meessage: "No user with that Email 🥹🥹" });
+      sendResponse(res, 404, false, "No user with that Email 🥹🥹");
     } else {
       //if yes-->email exist ->check password too
       const isEqual = bcrypt.compareSync(password, user.password);
 
       if (!isEqual) {
-        res
-          .status(404)
-          .json({ success: false, message: "Invalid password 🥹🥹" });
+        sendResponse(res, 404, false, "Invalid password");
       } else {
         //if password milyo vane -->token generate(jwt)
         const token = generateToken(user.id);
-
-        res
-          .status(200)
-          .json({ success: true, message: "Login successful! 🥳🥳", token });
+        sendResponse(res, 200, true, "Login Successful!", token);
       }
     }
   }
@@ -79,41 +66,87 @@ class UserController {
   static async handleForgotPassword(req: Request, res: Response) {
     const { email } = req.body;
     if (!email) {
-      res
-        .status(400)
-        .json({ success: false, message: "Please provide email!" });
+      sendResponse(res, 400, false, "Enter your Email");
       return;
     }
     const [user] = await User.findAll({
       where: {
-        email: email,
+        email,
       },
     });
     if (!user) {
-      res.status(404).json({
-        success: false,
-        message: "Email not registered!",
-      });
+      sendResponse(res, 404, false, "Email not registered");
       return;
     }
     try {
       //otp generate,mail sent
       const otp = generateOTP();
 
-      user.otp = otp.toString();
-      user.otpGeneratedTime = Date.now().toString();
-      await user.save();
-
       await sendMail({
         to: email,
         subject: "Password Reset",
         text: `Your OTP to change your password is ${otp}`,
       });
-      res
-        .status(200)
-        .json({ success: true, message: "OTP sent successfully!" });
+
+      user.otp = otp.toString();
+      user.otpGeneratedTime = Date.now().toString();
+      await user.save();
+
+      sendResponse(res, 200, true, "OTP sent Successfully!", [otp]);
     } catch (err) {
-      console.error("Couldnt send otp");
+      console.error("Couldnt send otp:", err);
+    }
+  }
+
+  static async verifyOTP(req: Request, res: Response) {
+    const { otp, email } = req.body;
+    if (!otp || !email) {
+      sendResponse(res, 400, false, "Please enter OTP and Email");
+      return;
+    }
+
+    const [user] = await findData(User, email);
+    if (!user) {
+      sendResponse(res, 404, false, "No user Found with that email");
+    }
+
+    //otp verification
+    const [data] = await User.findAll({
+      where: {
+        otp,
+        email,
+      },
+    });
+    if (!data) {
+      sendResponse(res, 404, false, "Invalid OTP");
+      return;
+    }
+    const otpGeneratedTime = data.otpGeneratedTime;
+    checkOTPExpiration(res, 120000, otpGeneratedTime);
+  }
+
+  static async resetPassword(req: Request, res: Response) {
+    const { newPassword, confirmPassword, otp, email } = req.body;
+    if (!newPassword || !confirmPassword || !email) {
+      sendResponse(res, 400, false, "Please fill all the fields!");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      sendResponse(
+        res,
+        400,
+        false,
+        "New password and confirm password must be same!"
+      );
+    } else {
+      const [user] = await findData(User, email);
+      if (!user) {
+        sendResponse(res, 404, false, "No email with that user");
+        return;
+      }
+      user.password = bcrypt.hashSync(newPassword, 12);
+      await user.save();
+      sendResponse(res, 200, true, "Password reset successfully!!");
     }
   }
 }
