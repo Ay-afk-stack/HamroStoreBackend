@@ -16,6 +16,12 @@ class UserController {
       return;
     }
     try {
+      const [data] = await User.findAll({ where: { email } });
+      if (data) {
+        sendResponse(res, 400, false, "Email already registered!");
+        return;
+      }
+
       await User.create({
         username,
         email,
