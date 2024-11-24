@@ -1,6 +1,7 @@
 import express, { Router } from "express";
-import categoryController from "../controllers/categoryController";
+import productController from "../controllers/productController";
 import userMiddleware, { Role } from "../middleware/userMiddleware";
+
 const router: Router = express.Router();
 
 router
@@ -8,21 +9,22 @@ router
   .post(
     userMiddleware.isUserLoggedIn,
     userMiddleware.accessTo(Role.Admin),
-    categoryController.addCategory
+    productController.createProduct
   )
-  .get(categoryController.getCategories);
+  .get(productController.getAllProduct);
 
 router
   .route("/:id")
   .patch(
     userMiddleware.isUserLoggedIn,
     userMiddleware.accessTo(Role.Admin),
-    categoryController.updateCategory
+    productController.updateProduct
   )
+  .get(productController.getSingleProduct)
   .delete(
     userMiddleware.isUserLoggedIn,
     userMiddleware.accessTo(Role.Admin),
-    categoryController.deleteCategory
+    productController.deleteProduct
   );
 
 export default router;

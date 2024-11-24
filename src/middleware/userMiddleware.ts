@@ -54,10 +54,10 @@ class UserMiddleware {
     );
   }
 
-  restrictTo(...roles: Role[]) {
+  accessTo(...roles: Role[]) {
     return (req: IExtendedRequest, res: Response, next: NextFunction) => {
       let userRole = req.user?.role as Role;
-      if (userRole === Role.Customer) {
+      if (!roles.includes(userRole)) {
         sendResponse(res, 403, false, "Permission not granted!");
         return;
       }
